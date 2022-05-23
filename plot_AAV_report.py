@@ -89,8 +89,52 @@ def parse_summary(in_prefix):
             mapping_dists['Identities'].append(float(line[col_to_idx['map_iden']]))
     return mapping_dists
 
-def parse_per_read(in_prefix):
-    pass
+def parse_per_read(in_prefix, out_prefix):
+    '''
+    RL dist per assigned type
+    Table:
+        assigned type | assigned subtype | count | frequency (%)
+
+    type_RL = { ssAAV = [2000, 4000, ...], unknown = [5000, ...] } <- to be made into violin plots
+    type_table = { ssAAV: {subtype: count}, ... }
+    '''
+    type_RL, type_table = {}, {}
+    col_to_idx, first, nreads = {}, True, 0
+    with open(in_prefix + '.per_read.csv') as f:
+        for line in f:
+            line = line.rstrip().split('\t')
+            if first:
+                for idx, col in enumerate(line):
+                    col_to_idx[col] = idx
+                first = False
+                continue
+            rlen = int(line[col_to_idx['read_len']])
+            a_type = line[col_to_idx['assigned_type']]
+            a_subtype = line[col_to_idx['assigned_subtype']]
+
+            # numbers for the read lengths
+            if a_type not in type_RL:
+                type_RL[a_type] = []
+            type_RL[a_type].append(rlen)
+
+            # numbers for the table
+            if a_type not in type_table:
+                type_table[a_type] = {a_subtype: 1}
+            elif a_subtype not in type_table[a_type]:
+                type_table[a_type][a_subtype] = 1
+            else:
+                type_table[a_type][a_subtype] += 1
+            nreads += 1
+
+    # output the type table
+    out_fh = open(out_prefix + '.type_breakdown.tsv', 'w+')
+    print('Assigned type\tAssigned subtype\tCount\tFrequency (%)', file=out_fh)
+    for a_type, subdict in type_table.items():
+        for a_subtype, count in subdict.items():
+            print(f'{a_type}\t{a_subtype}\t{count}\t{count/nreads*100:.2f}', file=out_fh)
+    out_fh.close()
+
+    return type_RL
 
 def parse_nonmatch(in_prefix):
     pass
@@ -130,6 +174,7 @@ def plot_mapping_dists(mapping_dists, ref_range, out):
 
 def main(args):
     mapping_dists = parse_summary(args.input_prefix)
+    type_RL = parse_per_read(args.input_prefix, args.output_prefix)
     ref_range = (min(mapping_dists['Starts']), max(mapping_dists['Ends']))
     plot_mapping_dists(mapping_dists, ref_range, args.output_prefix)
 
