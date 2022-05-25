@@ -5,25 +5,25 @@
 Reproduce Liz's AAV report (originally in R)
 
 Plots:
-    - Distribution of mapped reference start position ]
-    - Distribution of mapped reference end position   ] *.summary.csv
-    - Distribution of mapped reference length         ]
+    [x] Distribution of mapped reference start position ]
+    [x] Distribution of mapped reference end position   ] *.summary.csv
+    [x] Distribution of mapped reference length         ]
 
-    - Distribution of non-matches by reference position: substitutions ]
-    - Distribution of non-matches by reference position: deletions     ] *.nonmatch_stat.csv
-    - Distribution of non-matches by reference position: insertions    ]
+    [ ] Distribution of non-matches by reference position: substitutions ]
+    [ ] Distribution of non-matches by reference position: deletions     ] *.nonmatch_stat.csv
+    [ ] Distribution of non-matches by reference position: insertions    ]
     
-    - Distribution of mapped identity to reference                                         } *.summary.csv
-    - Distribution of non-matches by ref position and size of non-match                    ] *.nonmatch_stat.csv
-    - Distribution of non-matches by ref position and size of non-match - limit to <100bp  ]
+    [x] Distribution of mapped identity to reference                                         } *.summary.csv
+    [ ] Distribution of non-matches by ref position and size of non-match                    ] *.nonmatch_stat.csv
+    [ ] Distribution of non-matches by ref position and size of non-match - limit to <100bp  ]
 
-    - RL distribution by assigned AAV type } *.per_read.csv
+    [x] RL distribution by assigned AAV type } *.per_read.csv
 
 Tables:
-    - Length distribution of different non-matches ] *.nonmatch_stat.csv
-        error type, length, count, frequency       ]
-    - AAV type breakdown                           ] *.per_read.csv
-        assigned type, subtype, count, frequency   ]
+    [ ] Length distribution of different non-matches ] *.nonmatch_stat.csv
+        error type, length, count, frequency         ]
+    [x] AAV type breakdown                           ] *.per_read.csv
+        assigned type, subtype, count, frequency     ]
 
 Usage:
     python3 plot_AAV_report.py \
@@ -92,13 +92,12 @@ def parse_summary(in_prefix):
 def parse_per_read(in_prefix, out_prefix):
     '''
     RL dist per assigned type
-    Table:
-        assigned type | assigned subtype | count | frequency (%)
+    Table: assigned type | assigned subtype | count | frequency (%)
 
-    type_RL = { ssAAV = [2000, 4000, ...], unknown = [5000, ...] } <- to be made into violin plots
+    type_rl = { ssAAV = [2000, 4000, ...], unknown = [5000, ...] } (for violin plots)
     type_table = { ssAAV: {subtype: count}, ... }
     '''
-    type_RL, type_table = {}, {}
+    type_rl, type_table = {}, {}
     col_to_idx, first, nreads = {}, True, 0
     with open(in_prefix + '.per_read.csv') as f:
         for line in f:
@@ -113,9 +112,9 @@ def parse_per_read(in_prefix, out_prefix):
             a_subtype = line[col_to_idx['assigned_subtype']]
 
             # numbers for the read lengths
-            if a_type not in type_RL:
-                type_RL[a_type] = []
-            type_RL[a_type].append(rlen)
+            if a_type not in type_rl:
+                type_rl[a_type] = []
+            type_rl[a_type].append(rlen)
 
             # numbers for the table
             if a_type not in type_table:
@@ -134,7 +133,7 @@ def parse_per_read(in_prefix, out_prefix):
             print(f'{a_type}\t{a_subtype}\t{count}\t{count/nreads*100:.2f}', file=out_fh)
     out_fh.close()
 
-    return type_RL
+    return type_rl
 
 def parse_nonmatch(in_prefix):
     pass
@@ -172,11 +171,38 @@ def plot_mapping_dists(mapping_dists, ref_range, out):
         plt.savefig(output, dpi=600)
         plt.close()
 
+def plot_rl_violins(type_rl, out):
+    plt.figure(figsize=(6, 3))
+    plt.style.use('clean')
+    v = plt.axes([0.15, 0.125, 0.8, 0.8])
+
+    labels, curr_pos = [], 1
+    for a_type, lens in type_rl.items():
+        # setting points=len(lens) can be dangerous for big datasets
+        farts = v.violinplot(lens, positions=[curr_pos], points=len(lens))
+        labels.append(a_type)
+        curr_pos += 1
+        for pc in farts['bodies']:
+            pc.set_color('black')
+            pc.set_alpha(1)
+        farts['cmins'].set_color('black')
+        farts['cmaxes'].set_color('black')
+        farts['cbars'].set_color('black')
+
+    v.set_xlim(0, curr_pos)
+    v.set_xticks(range(1, curr_pos))
+    v.set_xticklabels(labels)
+    v.set_xlabel('Assigned AAV type')
+    v.set_ylabel('Read length')
+    plt.savefig(out + '_rl_dist.png', dpi=600)
+
 def main(args):
     mapping_dists = parse_summary(args.input_prefix)
-    type_RL = parse_per_read(args.input_prefix, args.output_prefix)
+    type_rl = parse_per_read(args.input_prefix, args.output_prefix)
+
     ref_range = (min(mapping_dists['Starts']), max(mapping_dists['Ends']))
     plot_mapping_dists(mapping_dists, ref_range, args.output_prefix)
+    plot_rl_violins(type_rl, args.output_prefix)
 
 if __name__ == '__main__':
     args = parse_args()
