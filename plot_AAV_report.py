@@ -9,13 +9,13 @@ Plots:
     [x] Distribution of mapped reference end position   ] *.summary.csv
     [x] Distribution of mapped reference length         ]
 
-    [ ] Distribution of non-matches by reference position: substitutions ]
-    [ ] Distribution of non-matches by reference position: deletions     ] *.nonmatch_stat.csv
-    [ ] Distribution of non-matches by reference position: insertions    ]
+    [x] Distribution of non-matches by reference position: substitutions ]
+    [x] Distribution of non-matches by reference position: deletions     ] *.nonmatch_stat.csv
+    [x] Distribution of non-matches by reference position: insertions    ]
     
     [x] Distribution of mapped identity to reference                                         } *.summary.csv
-    [ ] Distribution of non-matches by ref position and size of non-match                    ] *.nonmatch_stat.csv
-    [ ] Distribution of non-matches by ref position and size of non-match - limit to <100bp  ]
+    [x] Distribution of non-matches by ref position and size of non-match                    ] *.nonmatch_stat.csv
+    [x] Distribution of non-matches by ref position and size of non-match - limit to <100bp  ]
 
     [x] RL distribution by assigned AAV type } *.per_read.csv
 
@@ -283,7 +283,33 @@ def plot_error_dists(error_dict, ref_range, out):
 
 def plot_error_lens(error_dict, ref_range, out):
     # error type: [(error_pos, error_len), ...]
-    pass
+    plt.figure(figsize=(6, 3))
+    plt.style.use('clean')
+    s = plt.axes([0.15, 0.125, 0.8, 0.8])
+    zoom = 'full'
+    err_to_color = {'D': pbp.pink, 'I': pbp.green, 'X': pbp.blue}
+
+    legend = []
+    for e_type, err_list in error_dict.items():
+        x, y = list(zip(*err_list))
+        color = err_to_color[e_type]
+        line, = s.plot(x, y, lw=0, c=color, marker='o', ms=5, mew=0, alpha=0.5, label=e_type)
+        legend.append(line)
+
+    s.legend(handles=legend)
+    s.set_ylabel('Error length')
+    s.set_xlabel('Reference position')
+    s.set_title('Distribution of error lengths')
+    output = out + f'.{zoom}_err_length_dist.png'
+    plt.savefig(output, dpi=600)
+
+    s.set_ylim(0, 100)
+    s.set_title('Distribution of error lengths (<100 bp)')
+    zoom = 'zoomed'
+    output = out + f'.{zoom}_err_length_dist.png'
+    plt.savefig(output, dpi=600)
+
+    plt.close()
 
 def main(args):
     mapping_dists = parse_summary(args.input_prefix)
@@ -294,7 +320,7 @@ def main(args):
     plot_mapping_dists(mapping_dists, ref_range, args.output_prefix)
     plot_rl_violins(type_rl, args.output_prefix)
     plot_error_dists(error_dict, ref_range, args.output_prefix)
-    # plot_error_lens(error_dict, ref_range, args.output_prefix)
+    plot_error_lens(error_dict, ref_range, args.output_prefix)
 
 if __name__ == '__main__':
     args = parse_args()
