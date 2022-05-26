@@ -20,7 +20,7 @@ Plots:
     [x] RL distribution by assigned AAV type } *.per_read.csv
 
 Tables:
-    [ ] Length distribution of different non-matches ] *.nonmatch_stat.csv
+    [x] Length distribution of different non-matches ] *.nonmatch_stat.csv
         error type, length, count, frequency         ]
     [x] AAV type breakdown                           ] *.per_read.csv
         assigned type, subtype, count, frequency     ]
@@ -135,8 +135,56 @@ def parse_per_read(in_prefix, out_prefix):
 
     return type_rl
 
-def parse_nonmatch(in_prefix):
-    pass
+def parse_nonmatch(in_prefix, out_prefix):
+    '''
+    Gets all of the relevant info out of *.nonmatch_stat.csv
+        - dist of each error mode (per base)
+        - position vs error mode and size
+            - position vs error mode and size zoom in to <100bp
+        - table breakdown of error mode and length
+    '''
+    error_dict = {} # error type: [(error_pos, error_len), ...]
+    col_to_idx, first = {}, True
+    total_errs = 0
+    with open(in_prefix + '.nonmatch_stat.csv') as f:
+        for line in f:
+            line = line.rstrip().split('\t')
+            if first:
+                # columns: read_id, pos0, type, type_len
+                for idx, col in enumerate(line):
+                    col_to_idx[col] = idx
+                first = False
+                continue
+            position = int(line[col_to_idx['pos0']])
+            error_type = line[col_to_idx['type']]
+            error_len = int(line[col_to_idx['type_len']])
+
+            if error_type not in error_dict:
+                error_dict[error_type] = []
+            error_dict[error_type].append((position, error_len))
+            total_errs += 1
+
+    out_fh = open(out_prefix + '.nonmatch_lengths.tsv', 'w+')
+    print('Error type\tError length\tCount\tFrequency (%)', file=out_fh)
+    idx_to_lbin = {0: '0-10', 1: '11-100', 2: '101-500', 3: '>500'}
+    for e_type, err_list in error_dict.items():
+        tmp_len = [0] * 4 # [0-10, 11-100, 101-500, >500]
+        for e_tuple in err_list:
+            if e_tuple[1] < 11:
+                tmp_len[0] += 1
+            elif e_tuple[1] < 101:
+                tmp_len[1] += 1
+            elif e_tuple[1] < 501:
+                tmp_len[2] += 1
+            else:
+                tmp_len[3] += 1
+        for idx, count in enumerate(tmp_len):
+            if not count:
+                continue
+            print(f'{e_type}\t{idx_to_lbin[idx]}\t{count}\t{count/total_errs*100:.2f}', file=out_fh)
+    out_fh.close()
+
+    return error_dict
 
 def plot_mapping_dists(mapping_dists, ref_range, out):
     for plot_type, dist in mapping_dists.items():
@@ -196,13 +244,22 @@ def plot_rl_violins(type_rl, out):
     v.set_ylabel('Read length')
     plt.savefig(out + '_rl_dist.png', dpi=600)
 
+def plot_error_dists(error_dict, ref_range, out):
+    pass
+
+def plot_error_lens(error_dict, ref_range, out):
+    pass
+
 def main(args):
     mapping_dists = parse_summary(args.input_prefix)
     type_rl = parse_per_read(args.input_prefix, args.output_prefix)
-
     ref_range = (min(mapping_dists['Starts']), max(mapping_dists['Ends']))
+    error_dict = parse_nonmatch(args.input_prefix, args.output_prefix)
+
     plot_mapping_dists(mapping_dists, ref_range, args.output_prefix)
     plot_rl_violins(type_rl, args.output_prefix)
+    # plot_error_dists(error_dict, ref_range, args.output_prefix)
+    # plot_error_lens(error_dict, ref_range, args.output_prefix)
 
 if __name__ == '__main__':
     args = parse_args()
