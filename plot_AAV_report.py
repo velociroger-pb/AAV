@@ -211,9 +211,11 @@ def plot_mapping_dists(mapping_dists, ref_range, out):
         if plot_type != 'Identities':
             h.set_xlabel(f'Mapped reference {plot_type.lower()}')
             h.set_ylabel('Fraction of reads')
+            h.set_title(f'Distribution of mapped reference {plot_type.lower()}')
         else:
             h.set_xlabel('Mapping identity')
             h.set_ylabel('Read count')
+            h.set_title('Distribution of mapped identity to reference')
 
         output = out + f'.{plot_type.lower()}_dist.png'
         plt.savefig(output, dpi=600)
@@ -242,12 +244,45 @@ def plot_rl_violins(type_rl, out):
     v.set_xticklabels(labels)
     v.set_xlabel('Assigned AAV type')
     v.set_ylabel('Read length')
+    v.set_title('Distribution of read lengths by assigned AAV type')
     plt.savefig(out + '_rl_dist.png', dpi=600)
 
 def plot_error_dists(error_dict, ref_range, out):
-    pass
+    # error type: [(error_pos, error_len), ...]
+    type_to_name = {'D': 'deletion', 'I': 'insertion', 'X': 'mismatch'}
+    type_to_plural = {'D': 'deletions', 'I': 'insertions', 'X': 'mismatches'}
+    for err_type, err_list in error_dict.items():
+        plt.figure(figsize=(6, 3))
+        plt.style.use('clean')
+        h = plt.axes([0.15, 0.125, 0.8, 0.8])
+
+        name, plural = type_to_name[err_type], type_to_plural[err_type]
+
+        # err_dist = list(range(ref_range[0], ref_range[1]))
+        err_dist = [0] * ref_range[1]
+        for e in err_list:
+            # index at the err pos - 1
+            err_dist[e[0]-1] += 1
+
+        for left, height in enumerate(err_dist):
+            # lines are hard to see if the width is only 1 :/
+            # another way to get around visibility is to bump dpi to like 1200
+            box = Rect((left-0.5, 0), 2, height, lw=1, fc='black')
+            h.add_patch(box)
+
+        max_height = max(err_dist)
+        h.set_xlim(0-(ref_range[1]*0.05), ref_range[1]*1.05)
+        h.set_ylim(0-(max_height*0.05), max_height*1.05)
+        h.set_xlabel('Reference position')
+        h.set_ylabel('Error count')
+        h.set_title(f'Distribution of {plural} by reference position')
+
+        output = out + f'.{name}_dist.png'
+        plt.savefig(output, dpi=600)
+        plt.close()
 
 def plot_error_lens(error_dict, ref_range, out):
+    # error type: [(error_pos, error_len), ...]
     pass
 
 def main(args):
@@ -258,7 +293,7 @@ def main(args):
 
     plot_mapping_dists(mapping_dists, ref_range, args.output_prefix)
     plot_rl_violins(type_rl, args.output_prefix)
-    # plot_error_dists(error_dict, ref_range, args.output_prefix)
+    plot_error_dists(error_dict, ref_range, args.output_prefix)
     # plot_error_lens(error_dict, ref_range, args.output_prefix)
 
 if __name__ == '__main__':
